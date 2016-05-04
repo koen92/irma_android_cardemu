@@ -51,10 +51,10 @@ import java.util.List;
 /**
  * Adapter for picking an attribute from a {@link AttributeDisjunction}, for use in a {@link SessionDialogFragment}.
  */
-public class AttributesPickerAdapter extends BaseAdapter {
+public class AttributesPickerAdapter<T extends AttributeDisjunction> extends BaseAdapter {
 	Context context;
 	LayoutInflater inflater;
-	AttributeDisjunction disjunction;
+	T disjunction;
 	LinkedHashMap<AttributeIdentifier, String> objects;
 	List<AttributeIdentifier> identifiers;
 	int selected;
@@ -67,7 +67,7 @@ public class AttributesPickerAdapter extends BaseAdapter {
 	 * @param index The index in the containing {@link DisclosureProofRequest} (for fetching with
 	 * {@link #getIndex()})
 	 */
-	public AttributesPickerAdapter(Context context, AttributeDisjunction disjunction, int index) {
+	public AttributesPickerAdapter(Context context, T disjunction, int index) {
 		this.context = context;
 		this.disjunction = disjunction;
 		this.index = index;
@@ -135,7 +135,7 @@ public class AttributesPickerAdapter extends BaseAdapter {
 	 * @param position Zero-based number specifying the selected attribute
 	 * @return The {@link AttributeDisjunction} that contained the attribute, with the selected member set
 	 */
-	public AttributeDisjunction setSelected(int position) {
+	public T setSelected(int position) {
 		selected = position;
 		disjunction.setSelected(identifiers.get(selected));
 		return disjunction;

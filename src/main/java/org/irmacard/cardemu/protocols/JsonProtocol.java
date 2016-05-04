@@ -8,6 +8,7 @@ import org.irmacard.android.util.credentials.StoreManager;
 import org.irmacard.api.common.DisclosureProofRequest;
 import org.irmacard.api.common.DisclosureProofResult;
 import org.irmacard.api.common.IssuingRequest;
+import org.irmacard.api.common.SignatureProofRequest;
 import org.irmacard.api.common.exceptions.ApiErrorMessage;
 import org.irmacard.api.common.util.GsonUtil;
 import org.irmacard.cardemu.CredentialManager;
@@ -49,6 +50,9 @@ public class JsonProtocol extends Protocol {
 		else if (Pattern.matches(".*/issue/[^/]+/$", server)) {
 			action = ProtocolHandler.Action.ISSUING;
 			startIssuance();
+		} else if (Pattern.matches(".*/signature/[^/]+/$", server)) {
+			action = ProtocolHandler.Action.SINGING;
+			startSigning();
 		}
 	}
 
@@ -179,7 +183,7 @@ public class JsonProtocol extends Protocol {
 				try {
 					CredentialManager.constructCredentials(result);
 					handler.onSuccess(ProtocolHandler.Action.ISSUING);
-				} catch (InfoException|CredentialsException e) {
+				} catch (InfoException | CredentialsException e) {
 					fail(e, false); // No need to inform the server if this failed
 				}
 			}
@@ -209,6 +213,43 @@ public class JsonProtocol extends Protocol {
 					@Override public void onSuccess() {
 						handler.onStatusUpdate(ProtocolHandler.Action.DISCLOSING, ProtocolHandler.Status.CONNECTED);
 						handler.askForVerificationPermission(request);
+					}
+
+					@Override public void onError(Exception e) {
+						if (e instanceof InfoException)
+							fail("Unknown scheme manager", true);
+						if (e instanceof IOException)
+							fail("Could not download credential or issuer information", true);
+					}
+				});
+			}
+		});
+	}
+
+	/**
+	 * Retrieve a {@link SignatureProofRequest} from the server, see if we can satisfy it, and if so,
+	 * ask the user which attributes she wants to disclose.
+	 * TODO: merge with Disclosure request?
+	 */
+	private void startSigning() {
+		handler.onStatusUpdate(ProtocolHandler.Action.DISCLOSING, ProtocolHandler.Status.COMMUNICATING);
+		Log.i(TAG, "Retrieving signing request: " + server);
+
+		HttpClient client = new HttpClient(GsonUtil.getGson());
+
+		// Get the signature request
+		client.get(SignatureProofRequest.class, server, new JsonResultHandler<SignatureProofRequest>() {
+			@Override public void onSuccess(final SignatureProofRequest request) {
+				if (request.getContent().size() == 0 || request.getNonce() == null || request.getContext() == null) {
+					fail("Got malformed signature request", true);
+					return;
+				}
+
+				// If necessary, update the stores; afterwards, ask the user for permission to continue
+				StoreManager.download(request, new StoreManager.DownloadHandler() {
+					@Override public void onSuccess() {
+						handler.onStatusUpdate(ProtocolHandler.Action.SINGING, ProtocolHandler.Status.CONNECTED);
+						handler.askForSignPermission(request);
 					}
 					@Override public void onError(Exception e) {
 						if (e instanceof InfoException)
@@ -252,6 +293,40 @@ public class JsonProtocol extends Protocol {
 				}
 			}
 		});
+	}
+
+	/**
+	 * Given a {@link SignatureProofRequest} with selected attributes, create an IRMA signature.
+	 * TODO: maybe merge with disclose() ?
+	 */
+	@Override
+	public void sign(final SignatureProofRequest request) {
+		handler.onStatusUpdate(ProtocolHandler.Action.SINGING, ProtocolHandler.Status.COMMUNICATING);
+		Log.i(TAG, "Sending signature to " + server);
+
+		ProofList proofs;
+		try {
+			proofs = CredentialManager.getProofs(request);
+		} catch (CredentialsException | InfoException e) {
+			e.printStackTrace();
+			cancelSession();
+			fail(e, true);
+			return;
+		}
+
+		HttpClient client = new HttpClient(GsonUtil.getGson());
+		client.post(DisclosureProofResult.Status.class, server + "proofs", proofs,
+				new JsonResultHandler<DisclosureProofResult.Status>() {
+					@Override public void onSuccess(DisclosureProofResult.Status result) {
+						if (result == DisclosureProofResult.Status.VALID) {
+							handler.onSuccess(ProtocolHandler.Action.SINGING);
+						} else { // We successfully computed a proof but server rejects it? That's fishy, report it
+							String feedback = "Server rejected proof: " + result.name().toLowerCase();
+							ACRA.getErrorReporter().handleException(new Exception(feedback));
+							fail(feedback, false);
+						}
+					}
+				});
 	}
 
 	/**

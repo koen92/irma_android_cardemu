@@ -122,6 +122,8 @@ public class MainActivity extends Activity {
 			switch (action) {
 				case DISCLOSING:
 					setFeedback("Successfully disclosed attributes", "success"); break;
+				case SINGING:
+					setFeedback("Successfully signed message", "success"); break;
 				case ISSUING:
 					setFeedback("Issuing was successful", "success"); break;
 			}
@@ -132,6 +134,8 @@ public class MainActivity extends Activity {
 			switch (action) {
 				case DISCLOSING:
 					setFeedback("Cancelled disclosure", "warning"); break;
+				case SINGING:
+					setFeedback("Cancelled signing", "warning"); break;
 				case ISSUING:
 					setFeedback("Cancelled issuing", "warning"); break;
 			}
@@ -143,6 +147,8 @@ public class MainActivity extends Activity {
 			switch (action) {
 				case DISCLOSING:
 					feedback = "Disclosure failed: "; break;
+				case SINGING:
+					feedback = "Signing failed: "; break;
 				case ISSUING:
 					feedback = "Issuing failed: "; break;
 				case UNKNOWN:

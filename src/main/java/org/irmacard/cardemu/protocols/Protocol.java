@@ -5,6 +5,7 @@ import android.util.Patterns;
 import org.irmacard.api.common.ClientQr;
 import org.irmacard.api.common.DisclosureProofRequest;
 import org.irmacard.api.common.IssuingRequest;
+import org.irmacard.api.common.SignatureProofRequest;
 import org.irmacard.api.common.util.GsonUtil;
 import org.irmacard.cardemu.disclosuredialog.SessionDialogFragment;
 
@@ -23,6 +24,14 @@ public abstract class Protocol implements SessionDialogFragment.SessionDialogLis
 	 *                a selected attribute).
 	 */
 	abstract public void disclose(final DisclosureProofRequest request);
+
+	/**
+	 * Perform a signature session.
+	 * @param request The request containing the attributes to show (each of its disjunctions should have
+	 *                a selected attribute), and required conditions.
+	 */
+	abstract public void sign(final SignatureProofRequest request);
+
 
 	/**
 	 * Informs the session that this session is to be deleted.
@@ -66,6 +75,7 @@ public abstract class Protocol implements SessionDialogFragment.SessionDialogLis
 		String url = qr.getUrl();
 
 		// Check URL validity
+		// TODO http://localhost/foo/bar returns false on this matcher!
 		if (!Patterns.WEB_URL.matcher(url).matches()) {
 			handler.onFailure(ProtocolHandler.Action.UNKNOWN, "Protocol not supported", null);
 			return;
@@ -86,6 +96,16 @@ public abstract class Protocol implements SessionDialogFragment.SessionDialogLis
 	@Override
 	public void onDiscloseOK(final DisclosureProofRequest request) {
 		disclose(request);
+	}
+
+	@Override
+	public void onSignOK(final SignatureProofRequest request) {
+		sign(request);
+	}
+
+	@Override
+	public void onSignCancel() {
+		cancelSession();
 	}
 
 	@Override

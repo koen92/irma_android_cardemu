@@ -233,6 +233,18 @@ public class CredentialManager {
 	}
 
 	/**
+	 * Same as above method, but generate a signature instead
+	 * @param request
+	 * @return
+	 * @throws CredentialsException
+	 */
+	public static ProofList getProofs(SignatureProofRequest request) throws CredentialsException, InfoException {
+		boolean isSig = true;
+		ProofListBuilder builder = new ProofListBuilder(request.getContext(), request.getChallenge(), isSig);
+		return getProofs(request.getContent().toAttributeDisjunctionList(), builder).build();
+	}
+
+	/**
 	 * For the selected attribute of each disjunction, add a disclosure proof-commitment to the specified
 	 * proof builder.
 	 */

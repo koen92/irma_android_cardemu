@@ -9,7 +9,11 @@ import android.view.View;
 import org.irmacard.api.common.AttributeDisjunction;
 import org.irmacard.api.common.AttributeDisjunctionList;
 import org.irmacard.api.common.DisclosureProofRequest;
+import org.irmacard.api.common.DisclosureRequest;
 import org.irmacard.api.common.IssuingRequest;
+import org.irmacard.api.common.SigAttributeDisjunction;
+import org.irmacard.api.common.SigAttributeDisjunctionList;
+import org.irmacard.api.common.SignatureProofRequest;
 import org.irmacard.api.common.exceptions.ApiErrorMessage;
 import org.irmacard.api.common.util.GsonUtil;
 import org.irmacard.cardemu.CredentialManager;
@@ -35,7 +39,7 @@ public abstract class ProtocolHandler implements SessionDialogFragment.SessionDi
 
 	/** Specifies what action the protocol is performing. */
 	public enum Action {
-		DISCLOSING, ISSUING, UNKNOWN
+		DISCLOSING, ISSUING, SINGING, UNKNOWN
 	}
 
 	private Activity activity;
@@ -90,6 +94,32 @@ public abstract class ProtocolHandler implements SessionDialogFragment.SessionDi
 	}
 
 	/**
+	 * If this handler was given an activity in its constructor, ask the user if he is OK with signing the message and
+	 * the attributes specified in the request. If she agrees then they are signed immediately; if she
+	 * does not, or the request cannot be satisfied, then the connection is aborted after closing the dialog.
+	 * @param request The disclosure request
+	 */
+	public void askForSignPermission(final SignatureProofRequest request) {
+		if (activity == null) { // Can't show dialogs in this case
+			onSignOK(request);
+			return;
+		}
+
+		List<AttributeDisjunction> missing = CredentialManager.getUnsatisfiableDisjunctions(
+				request.getContent().toAttributeDisjunctionList());
+
+		// TODO: check conditions and give feedback to user if they are not met
+
+		if (missing.isEmpty()) {
+			SessionDialogFragment dialog = SessionDialogFragment.newSignDialog(request, this);
+			dialog.show(activity.getFragmentManager(), "signdialog");
+		}
+		else {
+			showUnsatisfiableRequestDialog(missing, request, Action.SINGING);
+		}
+	}
+
+	/**
 	 * If this handler was given an activity in its constructor, ask the user if he is OK with issuance
 	 * @param request The issuance request
 	 */
@@ -116,7 +146,7 @@ public abstract class ProtocolHandler implements SessionDialogFragment.SessionDi
 	}
 
 	public void showUnsatisfiableRequestDialog(List<AttributeDisjunction> missing,
-	                                           final DisclosureProofRequest request, final Action action) {
+	                                           final DisclosureRequest request, final Action action) {
 		String message = "The verifier requires attributes of the following kind: ";
 		int count = 0;
 		int max = missing.size();
@@ -164,6 +194,14 @@ public abstract class ProtocolHandler implements SessionDialogFragment.SessionDi
 
 	@Override public void onDiscloseOK(DisclosureProofRequest request) {
 		protocol.onDiscloseOK(request);
+	}
+
+	@Override public void onSignOK(SignatureProofRequest request) {
+		protocol.onSignOK(request);
+	}
+
+	@Override public void onSignCancel() {
+		protocol.onSignCancel();
 	}
 
 	@Override public void onDiscloseCancel() {
